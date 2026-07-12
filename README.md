@@ -1,6 +1,7 @@
 # 🤖 AutoDef
 
-AutoDef is a Python library that leverages Large Language Models (LLMs) to automatically implement, execute, and repair functions at runtime. It transforms docstrings into executable code, providing a seamless bridge between declarative intent and imperative execution.
+AutoDef is a Python library that leverages Large Language Models (LLMs) to automatically implement, execute, and repair functions at runtime.
+It transforms docstrings into executable code, providing a seamless bridge between declarative intent and imperative execution.
 
 ## ✨ Key Features
 
@@ -98,10 +99,11 @@ data = parse_config("{ invalid json }")
 ## 🧪 Development & Release
 
 ### Testing
-This project uses `uv` for dependency management. You can run all standard checks (linting, type checking, and tests) using the provided helper script:
+This project uses `uv` for dependency management and `aw` for script execution, install using `npm install -g @7obygit/aw`.
+You can run all standard checks (linting, type checking, and tests) using the provided helper script:
 
 ```bash
-./.aw/check.sh
+aw run check  # Runs ./.aw/check.sh
 ```
 
 Alternatively, you can run them manually:
@@ -118,15 +120,13 @@ Releases are automated via GitHub Actions using [Python Semantic Release](https:
 
 To trigger a new release:
 1. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `feat: add new feature`, `fix: resolve bug`).
-2. Push your changes to the `main` branch.
+2. Merge your changes to the `main` branch with a PR.
 3. The GitHub Action will automatically:
     - Determine the next version number.
     - Update `pyproject.toml` and `src/autodef/__init__.py`.
     - Generate a changelog.
     - Create a GitHub Release with the updated version tag.
     - Build and publish the package to PyPI.
-
-*Note: You must configure [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) on PyPI for this repository to allow the GitHub Action to publish.*
 
 ## 🧠 How it Works
 
