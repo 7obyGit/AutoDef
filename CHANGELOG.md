@@ -2,6 +2,13 @@
 
 
 
+## v0.3.0 (2026-07-12)
+
+### Feature
+
+* feat: Added typing ([`1467dc6`](https://github.com/7obyGit/AutoDef/commit/1467dc679d9909029f23ad91ea43581606826d3f))
+
+
 ## v0.2.0 (2026-07-12)
 
 ### Breaking
