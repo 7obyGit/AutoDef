@@ -27,6 +27,7 @@ Homepage = "https://github.com/7obyGit/AutoDef"
 Repository = "https://github.com/7obyGit/AutoDef"
 
 
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -73,6 +74,7 @@ revert = "Reverts"
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
 upload_to_vcs_release = true
+
 
 [dependency-groups]
 dev = [
