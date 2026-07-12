@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any, get_type_hints
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 
 from autodef.config import F, _default_service
 from autodef.model.prompt import Prompt
@@ -96,6 +96,42 @@ def llm(f: F | None = None, *, debug: bool = False) -> Any:
                 if debug:
                     logger.debug(f"Expecting Pydantic model: {return_type.__name__}")
                 result = _default_service.generate_object(prompt, return_type)
+            elif return_type is str:
+                if debug:
+                    logger.debug("Expecting raw text response (explicit str return type)")
+                result = _default_service.generate_text(prompt)
+            # Handle other primitive types and regular classes
+            elif return_type and return_type is not inspect.Signature.empty:
+                # If it's a primitive type, wrap it in a Pydantic model for structured output
+                if return_type in (int, float, bool):
+                    if debug:
+                        logger.debug(f"Expecting primitive type: {return_type.__name__}")
+                    wrapper_model = create_model("Wrapper", value=(return_type, ...))
+                    wrapped_result = _default_service.generate_object(prompt, wrapper_model)
+                    result = wrapped_result.value  # type: ignore[attr-defined]
+                # If it's a regular class, try to convert it to a Pydantic model
+                elif inspect.isclass(return_type):
+                    if debug:
+                        logger.debug(f"Expecting regular class: {return_type.__name__}")
+                    
+                    # Create a Pydantic model from the class
+                    try:
+                        # get_type_hints helps with forward references
+                        hints = get_type_hints(return_type)
+                        fields = {name: (typ, ...) for name, typ in hints.items()}
+                        dynamic_model = create_model(return_type.__name__, **fields)  # type: ignore
+                        
+                        structured_data = _default_service.generate_object(prompt, dynamic_model)
+                        # Instantiate the original class with the data
+                        result = return_type(**structured_data.model_dump())
+                    except Exception as e:
+                        if debug:
+                            logger.debug(f"Could not use structured output for {return_type}: {e}")
+                        result = _default_service.generate_text(prompt)
+                else:
+                    if debug:
+                        logger.debug(f"No specific handling for return type {return_type}, using raw text")
+                    result = _default_service.generate_text(prompt)
             else:
                 if debug:
                     logger.debug("Expecting raw text response")
