@@ -1,0 +1,84 @@
+[project]
+name = "autodef"
+version = "0.1.0"
+description = "AutoDef: LLM functions"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "7obyGit" }
+]
+license = { file = "LICENSE" }
+keywords = ["llm", "ai", "automation", "decorator", "pydantic", "openai", "code-generation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/7obyGit/AutoDef"
+Repository = "https://github.com/7obyGit/AutoDef"
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autodef"]
+
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "tests"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RET"]
+ignore = ["E501"]
+
+
+[tool.semantic_release]
+version_variable = ["src/autodef/__init__.py:__version__"]
+version_toml = ["pyproject.toml:project.version"]
+major_on_zero = false
+build_command = "pip install uv && uv build"
+
+[tool.semantic_release.branches.main]
+match = "main"
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = []
+
+[tool.semantic_release.changelog.sections]
+feature = "Features"
+fix = "Bug Fixes"
+breaking = "Breaking Changes"
+documentation = "Documentation"
+performance = "Performance Improvements"
+revert = "Reverts"
+
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "mypy>=1.10.0",
+    "ruff>=0.4.0",
+    "python-semantic-release>=9.8.0",
+]
+
