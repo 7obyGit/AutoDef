@@ -1,6 +1,6 @@
 [project]
 name = "autodef"
-version = "0.1.0"
+version = "0.2.0"
 description = "AutoDef: LLM functions"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,6 +25,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/7obyGit/AutoDef"
 Repository = "https://github.com/7obyGit/AutoDef"
+
 
 
 
@@ -74,6 +75,7 @@ revert = "Reverts"
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
 upload_to_vcs_release = true
+
 
 
 [dependency-groups]
