@@ -1,6 +1,6 @@
 [project]
 name = "autodef"
-version = "0.3.0"
+version = "0.0.0"
 description = "AutoDef: LLM functions"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -54,7 +54,6 @@ ignore = ["E501"]
 
 
 [tool.semantic_release]
-version_variable = ["src/autodef/__init__.py:__version__"]
 version_toml = ["pyproject.toml:project.version"]
 major_on_zero = false
 build_command = "pip install uv && uv build"

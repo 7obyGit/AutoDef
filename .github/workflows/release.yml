@@ -24,6 +24,9 @@ jobs:
         uses: python-semantic-release/python-semantic-release@v9.8.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit: false
+          tag: true
+          changelog: false
 
       - name: Upload artifacts
         if: steps.release.outputs.released == 'true'
