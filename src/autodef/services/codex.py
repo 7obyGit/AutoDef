@@ -10,11 +10,14 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypeVar
 
 from pydantic import BaseModel
 
 from autodef.model.prompt import Prompt
+
+T = TypeVar("T", bound=BaseModel)
+SandboxMode = Literal["read-only", "workspace-write", "danger-full-access"]
 
 
 class CodexUnavailableError(RuntimeError):
@@ -59,8 +62,8 @@ class CodexService:
             return self.run(self._prompt_text(prompt), cwd=cwd, images=images).output
 
     def generate_object(
-        self, prompt: Prompt[Any], object_type: type[BaseModel], *, cwd: Path | None = None
-    ) -> BaseModel:
+        self, prompt: Prompt[Any], object_type: type[T], *, cwd: Path | None = None
+    ) -> T:
         with tempfile.TemporaryDirectory(prefix="autodef-codex-") as temp_dir:
             schema_path = Path(temp_dir) / "schema.json"
             output_path = Path(temp_dir) / "output.json"
@@ -81,9 +84,9 @@ class CodexService:
         instruction: str,
         *,
         cwd: Path | None = None,
-        sandbox: str = "read-only",
+        sandbox: SandboxMode = "workspace-write",
         model: str | None = None,
-        image_values: Sequence[Any] = (),
+        image_values: Sequence[object] = (),
     ) -> TaskResult:
         with self._materialize_values_as_images(image_values) as images:
             return self.run(instruction, cwd=cwd, sandbox=sandbox, model=model, images=images)
@@ -130,7 +133,7 @@ class CodexService:
         instruction: str,
         *,
         cwd: Path | None = None,
-        sandbox: str = "read-only",
+        sandbox: SandboxMode = "workspace-write",
         output_schema: Path | None = None,
         output_path: Path | None = None,
         model: str | None = None,

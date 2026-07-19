@@ -4,12 +4,12 @@ import os
 import shutil
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
 from autodef.model.prompt import Prompt
-from autodef.services.codex import CodexService, TaskResult
+from autodef.services.codex import CodexService, SandboxMode, TaskResult
 from autodef.services.text_generator import TextGeneratorService
 
 
@@ -31,7 +31,7 @@ class ProviderService:
     def generate_text(self, prompt: Prompt[Any]) -> str:
         return self._text_service(prompt).generate_text(prompt)
 
-    def generate_object(self, prompt: Prompt[Any], object_type: type[BaseModel]) -> Any:
+    def generate_object(self, prompt: Prompt[Any], object_type: type[T]) -> T:
         return self._text_service(prompt).generate_object(prompt, object_type)
 
     def run_task(
@@ -39,9 +39,9 @@ class ProviderService:
         instruction: str,
         *,
         cwd: Path | None = None,
-        sandbox: str = "read-only",
+        sandbox: SandboxMode = "workspace-write",
         model: str | None = None,
-        image_values: Sequence[Any] = (),
+        image_values: Sequence[object] = (),
     ) -> TaskResult:
         return self.codex.run_task(
             instruction,
@@ -50,3 +50,4 @@ class ProviderService:
             model=model,
             image_values=image_values,
         )
+T = TypeVar("T", bound=BaseModel)

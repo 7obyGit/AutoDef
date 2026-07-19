@@ -23,7 +23,14 @@ def test_codex_service_parses_json_events(tmp_path: Path) -> None:
     assert result == TaskResult("done", result.events, 0, "thread-1")
     run.assert_called_once()
     command = run.call_args.args[0]
-    assert command[:6] == ["codex", "exec", "--json", "--ephemeral", "--sandbox", "read-only"]
+    assert command[:6] == [
+        "codex",
+        "exec",
+        "--json",
+        "--ephemeral",
+        "--sandbox",
+        "workspace-write",
+    ]
     assert "-C" in command
     assert "--image" in command
     assert str(tmp_path / "input.png") in command
