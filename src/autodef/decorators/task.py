@@ -2,29 +2,52 @@ from __future__ import annotations
 
 import functools
 import inspect
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
-from autodef.config import F, _default_service
-from autodef.services.codex import TaskResult
+from autodef.config import _default_service
+from autodef.services.codex import SandboxMode, TaskResult
 from autodef.services.context_builder import get_arg_display_value
 
 
-def task(
-    f: F | None = None,
+@overload
+def task[**P](
+    f: Callable[P, Any],
     *,
-    sandbox: str = "read-only",
+    sandbox: SandboxMode = "workspace-write",
     cwd: str | Path | None = None,
     model: str | None = None,
     debug: bool = False,
-) -> Any:
+) -> Callable[P, TaskResult]: ...
+
+
+@overload
+def task[**P](
+    f: None = None,
+    *,
+    sandbox: SandboxMode = "workspace-write",
+    cwd: str | Path | None = None,
+    model: str | None = None,
+    debug: bool = False,
+) -> Callable[[Callable[P, Any]], Callable[P, TaskResult]]: ...
+
+
+def task[**P](
+    f: Callable[P, Any] | None = None,
+    *,
+    sandbox: SandboxMode = "workspace-write",
+    cwd: str | Path | None = None,
+    model: str | None = None,
+    debug: bool = False,
+) -> Callable[P, TaskResult] | Callable[[Callable[P, Any]], Callable[P, TaskResult]]:
     """Run a function's documented task through Codex without interactive input."""
 
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, Any]) -> Callable[P, TaskResult]:
         signature = inspect.signature(func)
 
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> TaskResult:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> TaskResult:
             bound = signature.bind(*args, **kwargs)
             bound.apply_defaults()
             arguments = {
@@ -51,8 +74,8 @@ def task(
                 image_values=tuple(bound.arguments.values()),
             )
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     if f is None:
         return decorator
-    return decorator(f)
+    return decorator(f) if f is not None else decorator

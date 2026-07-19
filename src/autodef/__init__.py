@@ -5,7 +5,13 @@ except ImportError:
 
 from autodef.config import _default_service
 from autodef.decorators import impl, llm, shim, task
-from autodef.services.codex import CodexEvent, CodexExecutionError, CodexUnavailableError, TaskResult
+from autodef.services.codex import (
+    CodexEvent,
+    CodexExecutionError,
+    CodexUnavailableError,
+    SandboxMode,
+    TaskResult,
+)
 
 try:
     __version__ = version("autodef")
@@ -21,5 +27,6 @@ __all__ = [
     "CodexEvent",
     "CodexExecutionError",
     "CodexUnavailableError",
+    "SandboxMode",
     "_default_service",
 ]
