@@ -32,7 +32,10 @@ By default, local models will be used if available.
 export AUTODEF_API_KEY="your-api-key"
 export AUTODEF_BASE_URL="https://api.openai.com/v1"
 export AUTODEF_MODEL="gpt-5"
-exprt AUTODEF_CACHE_DIR=".autodef_cache"  # Optional, defaults to .autodef_cache
+export AUTODEF_CACHE_DIR=".autodef_cache"  # Optional, defaults to .autodef_cache
+
+# Optional provider selection: auto, codex, or lmstudio
+export AUTODEF_PROVIDER="auto"
 ```
 
 ## 🛠️ Usage Examples
@@ -95,6 +98,28 @@ def parse_config(raw_data: str) -> dict:
 # provide a fix (before, after, or a full rewrite).
 data = parse_config("{ invalid json }")
 ```
+
+### 4. Autonomous Codex Tasks (`@task`)
+
+When the Codex CLI is installed, `auto` selects it for the existing decorators and
+`@task` can run a complete non-interactive coding-agent task. Tasks return the final
+Codex report together with the emitted events and thread ID.
+
+```python
+from autodef import TaskResult, task
+
+@task(sandbox="workspace-write")
+def implement_change(request: str) -> TaskResult:
+    """Implement the requested change, run the relevant tests, and report the result."""
+    ...
+
+result = implement_change("Add validation for duplicate usernames")
+print(result.output)
+```
+
+Use `AUTODEF_PROVIDER=lmstudio` to force the existing LM Studio/OpenAI-compatible
+integration, or `AUTODEF_PROVIDER=codex` to require Codex. Tasks default to Codex's
+read-only sandbox; use `sandbox="workspace-write"` explicitly when edits are intended.
 
 ## 🧪 Development & Release
 

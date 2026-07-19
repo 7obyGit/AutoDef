@@ -136,7 +136,7 @@ def _get_result(prompt: Prompt[Any], return_type: Any, debug: bool) -> Any:
             )
         wrapper_model = create_model("Wrapper", value=(return_type, ...))
         wrapped_result = _default_service.generate_object(prompt, wrapper_model)
-        return wrapped_result.value  # type: ignore[attr-defined]
+        return wrapped_result.value
 
     # 4. Regular classes
     if inspect.isclass(return_type):
