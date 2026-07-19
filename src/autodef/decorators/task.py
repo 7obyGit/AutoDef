@@ -48,6 +48,7 @@ def task(
                 cwd=Path(cwd) if cwd else None,
                 sandbox=sandbox,
                 model=model,
+                image_values=tuple(bound.arguments.values()),
             )
 
         return wrapper  # type: ignore[return-value]

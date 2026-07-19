@@ -118,8 +118,9 @@ print(result.output)
 ```
 
 Use `AUTODEF_PROVIDER=lmstudio` to force the existing LM Studio/OpenAI-compatible
-integration, or `AUTODEF_PROVIDER=codex` to require Codex. Tasks default to Codex's
-read-only sandbox; use `sandbox="workspace-write"` explicitly when edits are intended.
+integration, or `AUTODEF_PROVIDER=codex` to require Codex. Image inputs are forwarded
+to Codex as attached files. Tasks default to Codex's read-only sandbox; use
+`sandbox="workspace-write"` explicitly when edits are intended.
 
 ## 🧪 Development & Release
 

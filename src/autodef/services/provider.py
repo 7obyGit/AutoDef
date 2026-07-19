@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -25,8 +26,6 @@ class ProviderService:
             return self.lmstudio
         if self.provider == "codex":
             return self.codex
-        if prompt.images:
-            return self.lmstudio
         return self.codex if shutil.which(self.codex.command) else self.lmstudio
 
     def generate_text(self, prompt: Prompt[Any]) -> str:
@@ -42,5 +41,12 @@ class ProviderService:
         cwd: Path | None = None,
         sandbox: str = "read-only",
         model: str | None = None,
+        image_values: Sequence[Any] = (),
     ) -> TaskResult:
-        return self.codex.run(instruction, cwd=cwd, sandbox=sandbox, model=model)
+        return self.codex.run_task(
+            instruction,
+            cwd=cwd,
+            sandbox=sandbox,
+            model=model,
+            image_values=image_values,
+        )
