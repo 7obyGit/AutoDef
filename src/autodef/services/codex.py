@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,6 +19,10 @@ from autodef.model.prompt import Prompt
 
 class CodexUnavailableError(RuntimeError):
     """Raised when the Codex CLI is not available."""
+
+
+class CodexExecutionError(RuntimeError):
+    """Raised when Codex cannot complete a task."""
 
 
 @dataclass(frozen=True)
@@ -48,7 +55,8 @@ class CodexService:
         return shutil.which(self.command) is not None
 
     def generate_text(self, prompt: Prompt[Any], *, cwd: Path | None = None) -> str:
-        return self.run(self._prompt_text(prompt), cwd=cwd).output
+        with self._materialize_base64_images(prompt.images) as images:
+            return self.run(self._prompt_text(prompt), cwd=cwd, images=images).output
 
     def generate_object(
         self, prompt: Prompt[Any], object_type: type[BaseModel], *, cwd: Path | None = None
@@ -57,14 +65,61 @@ class CodexService:
             schema_path = Path(temp_dir) / "schema.json"
             output_path = Path(temp_dir) / "output.json"
             schema_path.write_text(json.dumps(object_type.model_json_schema()))
-            result = self.run(
-                self._prompt_text(prompt),
-                cwd=cwd,
-                output_schema=schema_path,
-                output_path=output_path,
-            )
+            with self._materialize_base64_images(prompt.images) as images:
+                result = self.run(
+                    self._prompt_text(prompt),
+                    cwd=cwd,
+                    output_schema=schema_path,
+                    output_path=output_path,
+                    images=images,
+                )
             content = output_path.read_text() if output_path.exists() else result.output
             return object_type.model_validate_json(content)
+
+    def run_task(
+        self,
+        instruction: str,
+        *,
+        cwd: Path | None = None,
+        sandbox: str = "read-only",
+        model: str | None = None,
+        image_values: Sequence[Any] = (),
+    ) -> TaskResult:
+        with self._materialize_values_as_images(image_values) as images:
+            return self.run(instruction, cwd=cwd, sandbox=sandbox, model=model, images=images)
+
+    @staticmethod
+    @contextmanager
+    def _materialize_base64_images(images: Sequence[str]) -> Iterator[list[Path]]:
+        with tempfile.TemporaryDirectory(prefix="autodef-codex-images-") as temp_dir:
+            paths = []
+            for index, image in enumerate(images):
+                path = Path(temp_dir) / f"image-{index}.png"
+                path.write_bytes(base64.b64decode(image))
+                paths.append(path)
+            yield paths
+
+    @staticmethod
+    @contextmanager
+    def _materialize_values_as_images(values: Sequence[Any]) -> Iterator[list[Path]]:
+        from autodef.services.context_builder import process_image
+
+        with tempfile.TemporaryDirectory(prefix="autodef-codex-images-") as temp_dir:
+            paths = []
+            for index, value in enumerate(values):
+                if isinstance(value, (str, Path)):
+                    path = Path(value)
+                    if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+                        continue
+                    if path.is_file():
+                        paths.append(path)
+                        continue
+                encoded = process_image(value)
+                if encoded:
+                    path = Path(temp_dir) / f"image-{index}.png"
+                    path.write_bytes(base64.b64decode(encoded))
+                    paths.append(path)
+            yield paths
 
     @staticmethod
     def _prompt_text(prompt: Prompt[Any]) -> str:
@@ -79,6 +134,7 @@ class CodexService:
         output_schema: Path | None = None,
         output_path: Path | None = None,
         model: str | None = None,
+        images: Sequence[Path] = (),
     ) -> TaskResult:
         if not self.available:
             raise CodexUnavailableError(
@@ -94,15 +150,20 @@ class CodexService:
             command.extend(["--output-schema", str(output_schema)])
         if output_path is not None:
             command.extend(["--output-last-message", str(output_path)])
+        for image in images:
+            command.extend(["--image", str(image)])
         command.append(instruction)
 
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=str(cwd) if cwd else None,
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=str(cwd) if cwd else None,
+            )
+        except OSError as error:
+            raise CodexExecutionError(f"Unable to start Codex CLI '{self.command}': {error}") from error
         events: list[CodexEvent] = []
         final_output = ""
         thread_id: str | None = None
@@ -129,5 +190,9 @@ class CodexService:
             final_output = output_path.read_text()
         if completed.returncode != 0:
             detail = completed.stderr.strip() or final_output or "Codex task failed."
-            raise RuntimeError(f"Codex exited with status {completed.returncode}: {detail}")
+            raise CodexExecutionError(
+                f"Codex exited with status {completed.returncode}. "
+                "Check Codex authentication, repository location, and sandbox settings. "
+                f"Details: {detail}"
+            )
         return TaskResult(final_output, tuple(events), completed.returncode, thread_id)

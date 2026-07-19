@@ -18,13 +18,15 @@ def test_codex_service_parses_json_events(tmp_path: Path) -> None:
         patch.object(CodexService, "available", True),
         patch("autodef.services.codex.subprocess.run", return_value=completed) as run,
     ):
-        result = CodexService().run("do it", cwd=tmp_path)
+        result = CodexService().run("do it", cwd=tmp_path, images=[tmp_path / "input.png"])
 
     assert result == TaskResult("done", result.events, 0, "thread-1")
     run.assert_called_once()
     command = run.call_args.args[0]
     assert command[:6] == ["codex", "exec", "--json", "--ephemeral", "--sandbox", "read-only"]
     assert "-C" in command
+    assert "--image" in command
+    assert str(tmp_path / "input.png") in command
 
 
 def test_task_decorator_returns_codex_result() -> None:
