@@ -21,6 +21,20 @@ print(run.steps)     # The two recorded StepRun objects
 
 Calling a synchronous flow executes it immediately and returns `FlowRun[R]`, where `R` is the decorated function's return type. Failures are stored on the run instead of being raised by the initial call; `run.result()` returns `R` or re-raises the recorded failure.
 
+Flow lifecycle and step events are always sent to the standard-library `autodef.flows` logger at `INFO` level (failures use `ERROR`). Configure that logger using Python's normal logging handlers. Console output is separate and opt-in:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+@flow(progress=True)
+def tracked_work() -> int:
+    return step(lambda: 42, name="compute")
+```
+
+`progress=True` prints compact flow and step updates to stdout, including start, completion, retry attempts, failures, and elapsed time. It defaults to `False`, so library consumers do not receive unsolicited console output. The LLM pipeline example enables it because model calls can take noticeable time.
+
 ## Why operations are zero-argument callables
 
 `step()` accepts one callable that can be invoked without arguments:

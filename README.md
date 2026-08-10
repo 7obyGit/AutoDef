@@ -157,6 +157,7 @@ async def fetch_all(urls: list[str]) -> list[str]:
 ```
 
 Read the complete [typed flows guide](docs/flows.md) for composition, retry, async, background execution, cancellation, inspection, and failure semantics. Runnable demonstrations are grouped under the [flow examples](examples/README.md#flows).
+Flow events are emitted through Python's `autodef.flows` logger; pass `progress=True` to `@flow` when you also want compact live updates printed to the console.
 
 ### 5. Autonomous Codex Tasks (`@task`)
 

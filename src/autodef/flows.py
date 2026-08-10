@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import threading
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -10,6 +11,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import update_wrapper
 from typing import Any, cast, overload
+
+logger = logging.getLogger(__name__)
+_progress_lock = threading.RLock()
 
 
 class RunStatus(StrEnum):
@@ -84,6 +88,7 @@ class StepRun:
     error: BaseException | None = None
     attempts: list[AttemptRun] = field(default_factory=list)
     child_run: FlowRun[Any] | None = None
+    _owner_run: FlowRun[Any] | None = field(default=None, repr=False)
 
     @property
     def duration(self) -> float | None:
@@ -109,6 +114,9 @@ class FlowRun[R]:
         retry_of: FlowRun[R] | None = None,
     ) -> None:
         self._flow = flow
+        self._flow_name = flow._name
+        self._progress_enabled = flow._progress_enabled
+        self._parent_run = _current_run.get()
         self._args = args
         self._kwargs = kwargs
         self._is_async = is_async
@@ -123,6 +131,22 @@ class FlowRun[R]:
         self.finished_at: float | None = None
         self.retry_of = retry_of
         self._steps: list[StepRun] = []
+
+    @property
+    def progress(self) -> bool:
+        """Whether this run prints human-readable progress to stdout."""
+        return self._progress_enabled
+
+    @property
+    def name(self) -> str:
+        """The decorated flow name."""
+        return self._flow_name
+
+    @property
+    def _progress_depth(self) -> int:
+        if self._parent_run is None:
+            return 0
+        return self._parent_run._progress_depth + 1
 
     @property
     def steps(self) -> Sequence[StepRun]:
@@ -180,6 +204,7 @@ class FlowRun[R]:
             task = self._task
             loop = self._task_loop
 
+        _flow_event(self, "stop requested")
         if task is not None and loop is not None:
             loop.call_soon_threadsafe(task.cancel)
         return True
@@ -194,6 +219,7 @@ class FlowRun[R]:
             self.status = RunStatus.RUNNING
             self.started_at = time.monotonic()
             self._condition.notify_all()
+        _flow_event(self, "started")
 
     def _succeed(self, result: R) -> None:
         with self._condition:
@@ -204,6 +230,7 @@ class FlowRun[R]:
                 self.status = RunStatus.SUCCEEDED
             self.finished_at = time.monotonic()
             self._condition.notify_all()
+        _flow_event(self, "succeeded", duration=self.duration)
 
     def _fail(self, error: BaseException) -> None:
         with self._condition:
@@ -211,12 +238,14 @@ class FlowRun[R]:
             self.status = RunStatus.FAILED
             self.finished_at = time.monotonic()
             self._condition.notify_all()
+        _flow_event(self, f"failed: {error}", level=logging.ERROR, duration=self.duration)
 
     def _stopped(self) -> None:
         with self._condition:
             self.status = RunStatus.STOPPED
             self.finished_at = time.monotonic()
             self._condition.notify_all()
+        _flow_event(self, "stopped", duration=self.duration)
 
     def _add_step(self, step_run: StepRun) -> None:
         with self._condition:
@@ -253,9 +282,10 @@ class AsyncFlowRun[R](FlowRun[R]):
 class SyncFlow[**P, R]:
     """Callable wrapper for a synchronous flow function."""
 
-    def __init__(self, function: Callable[P, R]) -> None:
+    def __init__(self, function: Callable[P, R], *, progress: bool = False) -> None:
         self._function = function
         self._name = function.__name__
+        self._progress_enabled = progress
         update_wrapper(self, function)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> SyncFlowRun[R]:
@@ -313,9 +343,10 @@ class SyncFlow[**P, R]:
 class AsyncFlow[**P, R]:
     """Callable wrapper for an asynchronous flow function."""
 
-    def __init__(self, function: Callable[P, Awaitable[R]]) -> None:
+    def __init__(self, function: Callable[P, Awaitable[R]], *, progress: bool = False) -> None:
         self._function = function
         self._name = function.__name__
+        self._progress_enabled = progress
         update_wrapper(self, function)
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> AsyncFlowRun[R]:
@@ -387,6 +418,26 @@ class AsyncFlow[**P, R]:
             _current_run.reset(token)
 
 
+class _ConfiguredFlow:
+    """Decorator factory carrying flow options until a function is supplied."""
+
+    def __init__(self, *, progress: bool) -> None:
+        self._progress = progress
+
+    @overload
+    def __call__[**P, R](  # type: ignore[overload-overlap]
+        self, function: Callable[P, Awaitable[R]], /
+    ) -> AsyncFlow[P, R]: ...
+
+    @overload
+    def __call__[**P, R](self, function: Callable[P, R], /) -> SyncFlow[P, R]: ...
+
+    def __call__(self, function: Callable[..., Any], /) -> SyncFlow[..., Any] | AsyncFlow[..., Any]:
+        if inspect.iscoroutinefunction(function):
+            return AsyncFlow(cast(Callable[..., Awaitable[Any]], function), progress=self._progress)
+        return SyncFlow(function, progress=self._progress)
+
+
 @overload
 def flow[**P, R](  # type: ignore[overload-overlap]
     function: Callable[P, Awaitable[R]], /
@@ -397,11 +448,39 @@ def flow[**P, R](  # type: ignore[overload-overlap]
 def flow[**P, R](function: Callable[P, R], /) -> SyncFlow[P, R]: ...
 
 
-def flow[**P, R](function: Callable[P, R] | Callable[P, Awaitable[R]], /) -> SyncFlow[P, R] | AsyncFlow[P, R]:
-    """Turn a typed function into an observable, callable flow."""
+@overload
+def flow(*, progress: bool = False) -> _ConfiguredFlow: ...
+
+
+def flow(function: Callable[..., Any] | None = None, *, progress: bool = False) -> Any:
+    """Turn a typed function into an observable flow.
+
+    Set ``progress=True`` to print human-readable lifecycle and step updates.
+    Logging is always emitted through the ``autodef.flows`` logger.
+    """
+
+    if function is None:
+        return _ConfiguredFlow(progress=progress)
     if inspect.iscoroutinefunction(function):
-        return AsyncFlow(cast(Callable[P, Awaitable[R]], function))
-    return SyncFlow(cast(Callable[P, R], function))
+        return AsyncFlow(cast(Callable[..., Awaitable[Any]], function), progress=progress)
+    return SyncFlow(function, progress=progress)
+
+
+def _flow_event(run: FlowRun[Any], message: str, *, level: int = logging.INFO, duration: float | None = None) -> None:
+    if duration is not None:
+        message = f"{message} ({duration:.2f}s)"
+    logger.log(level, "[%s] %s", run.name, message)
+    if not run.progress:
+        return
+    prefix = "  " * run._progress_depth
+    with _progress_lock:
+        print(f"{prefix}[{run.name}] {message}", flush=True)
+
+
+def _step_event(step_run: StepRun, message: str, *, level: int = logging.INFO) -> None:
+    if step_run._owner_run is None:
+        return
+    _flow_event(step_run._owner_run, f"{step_run.name}: {message}", level=level, duration=step_run.duration)
 
 
 def _active_run() -> FlowRun[Any]:
@@ -421,10 +500,11 @@ def _step_name(operation: Callable[[], Any], run: FlowRun[Any], prefix: str) -> 
 
 def _begin_step(operation: Callable[[], Any], name: str | None, prefix: str) -> tuple[FlowRun[Any], StepRun]:
     run = _active_run()
-    step_run = StepRun(name=name or _step_name(operation, run, prefix), operation=operation)
+    step_run = StepRun(name=name or _step_name(operation, run, prefix), operation=operation, _owner_run=run)
     step_run.status = RunStatus.RUNNING
     step_run.started_at = time.monotonic()
     run._add_step(step_run)
+    _step_event(step_run, "started")
     return run, step_run
 
 
@@ -433,6 +513,8 @@ def _begin_attempt(step_run: StepRun) -> AttemptRun:
     attempt.status = RunStatus.RUNNING
     attempt.started_at = time.monotonic()
     step_run.attempts.append(attempt)
+    if attempt.number > 1:
+        _step_event(step_run, f"retry attempt {attempt.number}")
     return attempt
 
 
@@ -458,6 +540,7 @@ def _finish_step(step_run: StepRun, result: Any) -> Any:
     step_run.result = result
     step_run.status = RunStatus.SUCCEEDED
     step_run.finished_at = time.monotonic()
+    _step_event(step_run, "succeeded")
     return result
 
 
@@ -465,12 +548,14 @@ def _fail_step(step_run: StepRun, error: BaseException) -> None:
     step_run.error = error
     step_run.status = RunStatus.FAILED
     step_run.finished_at = time.monotonic()
+    _step_event(step_run, f"failed: {error}", level=logging.ERROR)
 
 
 def _stop_step(step_run: StepRun, error: BaseException) -> None:
     step_run.error = error
     step_run.status = RunStatus.STOPPED
     step_run.finished_at = time.monotonic()
+    _step_event(step_run, "stopped")
 
 
 def _unwrap_sync_result(result: Any, step_run: StepRun) -> Any:
