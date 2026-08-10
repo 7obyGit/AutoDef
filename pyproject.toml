@@ -52,6 +52,9 @@ target-version = "py312"
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RET"]
 ignore = ["E501"]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
@@ -86,4 +89,3 @@ dev = [
     "ruff>=0.4.0",
     "python-semantic-release>=9.8.0",
 ]
-
