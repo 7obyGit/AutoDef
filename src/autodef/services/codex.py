@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import json
 import os
 import shutil
@@ -21,6 +22,29 @@ T = TypeVar("T", bound=BaseModel)
 SandboxMode = Literal["read-only", "workspace-write", "danger-full-access"]
 DEFAULT_CODEX_MODEL = "gpt-5.6-luna"
 DEFAULT_CODEX_REASONING_EFFORT = "medium"
+
+
+def _strict_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Make object nodes compatible with Codex's strict structured-output schema."""
+    strict_schema = copy.deepcopy(schema)
+
+    def visit(node: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        if node.get("type") == "object":
+            node["additionalProperties"] = False
+            for property_schema in node.get("properties", {}).values():
+                visit(property_schema)
+        for key in ("$defs", "definitions"):
+            for definition in node.get(key, {}).values():
+                visit(definition)
+        for key in ("anyOf", "oneOf", "allOf", "prefixItems"):
+            for option in node.get(key, []):
+                visit(option)
+        visit(node.get("items"))
+
+    visit(strict_schema)
+    return strict_schema
 
 
 class CodexUnavailableError(RuntimeError):
@@ -117,7 +141,7 @@ class CodexService:
         with tempfile.TemporaryDirectory(prefix="autodef-codex-") as temp_dir:
             schema_path = Path(temp_dir) / "schema.json"
             output_path = Path(temp_dir) / "output.json"
-            schema_path.write_text(json.dumps(object_type.model_json_schema()))
+            schema_path.write_text(json.dumps(_strict_json_schema(object_type.model_json_schema())))
             with self._materialize_base64_images(prompt.images) as images:
                 result = self.run(
                     self._prompt_text(prompt),
@@ -243,7 +267,15 @@ class CodexService:
         if output_path and output_path.exists():
             final_output = output_path.read_text()
         if completed.returncode != 0:
-            detail = completed.stderr.strip() or final_output or "Codex task failed."
+            details = [completed.stderr.strip()] if completed.stderr.strip() else []
+            if final_output:
+                details.append(f"last response: {final_output}")
+            for event in events:
+                if event.type == "error":
+                    error_data = event.data.get("error") or event.data.get("message")
+                    if error_data:
+                        details.append(f"error event: {error_data}")
+            detail = " | ".join(details) or "Codex task failed."
             raise CodexExecutionError(
                 f"Codex exited with status {completed.returncode}. "
                 "Check Codex authentication, repository location, and sandbox settings. "
