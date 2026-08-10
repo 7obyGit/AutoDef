@@ -44,7 +44,7 @@ def test_sync_flow_records_steps_and_python_control_flow() -> None:
     assert run.duration is not None
 
 
-def test_flow_logs_lifecycle_and_progress_is_opt_in(
+def test_flow_logs_lifecycle_and_screen_tracking_is_opt_in(
     capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
 ) -> None:
     @flow
@@ -59,7 +59,7 @@ def test_flow_logs_lifecycle_and_progress_is_opt_in(
     assert any("[quiet] started" in record.message for record in caplog.records)
     assert any("work: succeeded" in record.message for record in caplog.records)
 
-    @flow(progress=True)
+    @flow(silent=False)
     def tracked() -> int:
         return step(lambda: 2, name="work")
 
