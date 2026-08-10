@@ -22,7 +22,7 @@ def main() -> None:
     target_file = "README.md"
     if not os.path.exists(target_file):
         # Fallback if run from different directory
-        target_file = os.path.join(os.path.dirname(__file__), "..", "README.md")
+        target_file = os.path.join(os.path.dirname(__file__), "..", "..", "README.md")
 
     if os.path.exists(target_file):
         try:
@@ -31,9 +31,7 @@ def main() -> None:
             print(f"\nFile Description:\n{description}")
         except Exception as e:
             print(f"Error: {e}")
-            print(
-                "\nNote: This example requires an LLM server (like LM Studio) running at http://localhost:1234/v1"
-            )
+            print("\nNote: This example requires an LLM server (like LM Studio) running at http://localhost:1234/v1")
     else:
         print(f"Error: Could not find {target_file}")
 

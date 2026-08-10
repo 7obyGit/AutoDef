@@ -36,7 +36,5 @@ if __name__ == "__main__":
         print(f"Failed even after retry: {e}")
 
     print("\nNote: To see error correction in action specifically, one would need a scenario ")
-    print(
-        "where the LLM's first attempt is syntactically correct but logically flawed for certain inputs, "
-    )
+    print("where the LLM's first attempt is syntactically correct but logically flawed for certain inputs, ")
     print("leading to a runtime error that triggers the retry mechanism.")
