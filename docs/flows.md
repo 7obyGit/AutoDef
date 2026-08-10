@@ -21,7 +21,7 @@ print(run.steps)     # The two recorded StepRun objects
 
 Calling a synchronous flow executes it immediately and returns `FlowRun[R]`, where `R` is the decorated function's return type. Failures are stored on the run instead of being raised by the initial call; `run.result()` returns `R` or re-raises the recorded failure.
 
-Flow lifecycle and step events are always sent to the standard-library `autodef.flows` logger at `INFO` level (failures use `ERROR`). Configure that logger using Python's normal logging handlers. Console output is separate and opt-in:
+Flow lifecycle and step events are always sent to the standard-library `autodef.flows` logger at `INFO` level (failures use `ERROR`). Configure that logger using Python's normal logging handlers. Console output is enabled by default and can be suppressed with `silent=True`:
 
 ```python
 import logging
@@ -33,7 +33,7 @@ def tracked_work() -> int:
     return step(lambda: 42, name="compute")
 ```
 
-`silent=False` prints compact flow and step updates to stdout, including start, completion, retry attempts, failures, and elapsed time. It defaults to `True`, so library consumers do not receive unsolicited console output. The LLM pipeline example enables tracking because model calls can take noticeable time.
+`silent=False` prints compact flow and step updates to stdout, including start, completion, retry attempts, failures, and elapsed time. It is the default. Set `silent=True` to suppress console output. The LLM pipeline example enables tracking explicitly because model calls can take noticeable time.
 
 ## Why operations are zero-argument callables
 

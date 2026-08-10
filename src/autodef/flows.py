@@ -282,7 +282,7 @@ class AsyncFlowRun[R](FlowRun[R]):
 class SyncFlow[**P, R]:
     """Callable wrapper for a synchronous flow function."""
 
-    def __init__(self, function: Callable[P, R], *, silent: bool = True) -> None:
+    def __init__(self, function: Callable[P, R], *, silent: bool = False) -> None:
         self._function = function
         self._name = function.__name__
         self._silent = silent
@@ -343,7 +343,7 @@ class SyncFlow[**P, R]:
 class AsyncFlow[**P, R]:
     """Callable wrapper for an asynchronous flow function."""
 
-    def __init__(self, function: Callable[P, Awaitable[R]], *, silent: bool = True) -> None:
+    def __init__(self, function: Callable[P, Awaitable[R]], *, silent: bool = False) -> None:
         self._function = function
         self._name = function.__name__
         self._silent = silent
@@ -449,14 +449,15 @@ def flow[**P, R](function: Callable[P, R], /) -> SyncFlow[P, R]: ...
 
 
 @overload
-def flow(*, silent: bool = True) -> _ConfiguredFlow: ...
+def flow(*, silent: bool = False) -> _ConfiguredFlow: ...
 
 
-def flow(function: Callable[..., Any] | None = None, *, silent: bool = True) -> Any:
+def flow(function: Callable[..., Any] | None = None, *, silent: bool = False) -> Any:
     """Turn a typed function into an observable flow.
 
-    Set ``silent=False`` to print human-readable lifecycle and step updates.
-    Logging is always emitted through the ``autodef.flows`` logger.
+    Flow tracking is enabled by default. Set ``silent=True`` to suppress
+    human-readable lifecycle and step updates. Logging is always emitted
+    through the ``autodef.flows`` logger.
     """
 
     if function is None:
