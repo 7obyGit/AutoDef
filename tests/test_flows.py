@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import threading
 from functools import partial
 
@@ -41,6 +42,34 @@ def test_sync_flow_records_steps_and_python_control_flow() -> None:
     assert all(record.status is RunStatus.SUCCEEDED for record in run.steps)
     assert run.steps[-1].result == 12
     assert run.duration is not None
+
+
+def test_flow_logs_lifecycle_and_progress_is_opt_in(
+    capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    @flow
+    def quiet() -> int:
+        return step(lambda: 1, name="work")
+
+    caplog.set_level(logging.INFO, logger="autodef.flows")
+    quiet_run = quiet()
+
+    assert quiet_run.result() == 1
+    assert capsys.readouterr().out == ""
+    assert any("[quiet] started" in record.message for record in caplog.records)
+    assert any("work: succeeded" in record.message for record in caplog.records)
+
+    @flow(progress=True)
+    def tracked() -> int:
+        return step(lambda: 2, name="work")
+
+    tracked_run = tracked()
+
+    assert tracked_run.result() == 2
+    output = capsys.readouterr().out
+    assert "[tracked] started" in output
+    assert "[tracked] work: succeeded" in output
+    assert "[tracked] succeeded" in output
 
 
 def test_step_uses_function_name_and_lambda_fallback() -> None:
