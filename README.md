@@ -37,6 +37,10 @@ export AUTODEF_CACHE_DIR=".autodef_cache"  # Optional, defaults to .autodef_cach
 
 # Optional provider selection: auto, codex, or lmstudio
 export AUTODEF_PROVIDER="auto"
+
+# Optional Codex overrides. When unset, installed Codex uses gpt-5.6-luna at medium reasoning.
+export AUTODEF_CODEX_MODEL="gpt-5.6-luna"
+export AUTODEF_CODEX_REASONING_EFFORT="medium"
 ```
 
 ## 🛠️ Usage Examples
