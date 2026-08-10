@@ -118,6 +118,8 @@ def draft_article(topic: str) -> str:
 
 Prefer structured Pydantic results between LLM steps. They make validation explicit and preserve useful static types across the pipeline.
 
+When Codex is installed, AutoDef's automatic provider selects it. Codex runs launched without an explicit working directory use the nearest Git root, so examples can be run from nested folders such as `examples/flows`. If no Git repository is available, AutoDef uses Codex's repo-check bypass and keeps the current directory as the workspace. The default Codex model is `gpt-5.6-luna` with medium reasoning; set `AUTODEF_CODEX_MODEL` or `AUTODEF_CODEX_REASONING_EFFORT` to override those defaults. An explicit Codex config value takes precedence over AutoDef's fallback.
+
 ## Explicit retries
 
 Steps do not retry by default. Use `retry()` when an operation is safe to repeat:
