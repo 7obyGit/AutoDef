@@ -12,7 +12,7 @@ def describe_image(image: Any) -> str:
 
 def main() -> None:
     # Path to the example image
-    example_png = Path(__file__).parent / "example.png"
+    example_png = Path(__file__).parents[1] / "assets" / "example.png"
 
     if not example_png.exists():
         print(f"Error: {example_png} not found.")

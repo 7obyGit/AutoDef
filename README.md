@@ -107,9 +107,13 @@ Every invocation returns a typed run object containing the result, status, timin
 
 ```python
 from autodef import RetryPolicy, flow, llm, retry, step
+from pydantic import BaseModel
+
+class ResearchPlan(BaseModel):
+    items: list[str]
 
 @llm
-def make_plan(topic: str) -> list[str]:
+def make_plan(topic: str) -> ResearchPlan:
     """Return a short research plan for the topic."""
     ...
 
@@ -127,7 +131,7 @@ def research(topic: str) -> str:
             lambda item=item: research_item(item),
             name=f"research_{index}",
         )
-        for index, item in enumerate(plan)
+        for index, item in enumerate(plan.items)
     ]
     return "\n".join(findings)
 
@@ -147,6 +151,8 @@ Use `await async_flow(...)` for an `async def` flow. Async step operations are a
 async def fetch_all(urls: list[str]) -> list[str]:
     return [await step(lambda url=url: fetch(url)) for url in urls]
 ```
+
+Read the complete [typed flows guide](docs/flows.md) for composition, retry, async, background execution, cancellation, inspection, and failure semantics. Runnable demonstrations are grouped under the [flow examples](examples/README.md#flows).
 
 ### 5. Autonomous Codex Tasks (`@task`)
 
@@ -172,6 +178,8 @@ to Codex as attached files. Tasks default to Codex's `workspace-write` sandbox. 
 `sandbox="read-only"` when a task must not modify the repository.
 
 ## 🧪 Development & Release
+
+All runnable examples are organized by feature in the [examples directory](examples/README.md).
 
 ### Testing
 This project uses `uv` for dependency management and `aw` for script execution, install using `npm install -g @7obygit/aw`.

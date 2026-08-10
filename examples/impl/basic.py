@@ -24,9 +24,7 @@ def main() -> None:
         print(f"Generated Person: {person}")
     except Exception as e:
         print(f"Error: {e}")
-        print(
-            "Note: This example requires an LLM server (like LM Studio) running at http://localhost:1234/v1"
-        )
+        print("Note: This example requires an LLM server (like LM Studio) running at http://localhost:1234/v1")
 
 
 if __name__ == "__main__":
