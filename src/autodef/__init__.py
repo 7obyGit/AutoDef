@@ -5,6 +5,16 @@ except ImportError:
 
 from autodef.config import _default_service
 from autodef.decorators import impl, llm, shim, task
+from autodef.flows import (
+    FlowRun,
+    FlowStoppedError,
+    RetryPolicy,
+    RunStatus,
+    StepRun,
+    flow,
+    retry,
+    step,
+)
 from autodef.services.codex import (
     CodexEvent,
     CodexExecutionError,
@@ -23,6 +33,14 @@ __all__ = [
     "llm",
     "shim",
     "task",
+    "flow",
+    "step",
+    "retry",
+    "RetryPolicy",
+    "FlowRun",
+    "StepRun",
+    "RunStatus",
+    "FlowStoppedError",
     "TaskResult",
     "CodexEvent",
     "CodexExecutionError",
