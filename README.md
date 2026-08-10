@@ -8,6 +8,7 @@ It transforms docstrings into executable code, providing a seamless bridge betwe
 - **`@impl` Decorator**: Automatically generates function bodies from docstrings and type hints.
 - **`@llm` Decorator**: Directly routes function calls to an LLM, supporting raw text and structured Pydantic responses.
 - **`@shim` Decorator**: Intelligent error recovery that automatically repairs failing functions at runtime.
+- **Typed flows**: Compose ordinary and LLM-backed functions into observable workflows with explicit steps and retries.
 - **📦 Smart Caching**: Generated code is persisted locally, ensuring stability, predictability, and performance.
 - **🔍 Context Awareness**: Automatically includes local file context and type definitions in prompts.
 - **🖼️ Multimodal Support**: Seamlessly handle images and file paths as function arguments.
@@ -99,7 +100,55 @@ def parse_config(raw_data: str) -> dict:
 data = parse_config("{ invalid json }")
 ```
 
-### 4. Autonomous Codex Tasks (`@task`)
+### 4. Typed workflows (`@flow`)
+
+Flows use normal Python for decisions and loops while recording the operations you explicitly mark as steps.
+Every invocation returns a typed run object containing the result, status, timings, attempts, and child flows.
+
+```python
+from autodef import RetryPolicy, flow, llm, retry, step
+
+@llm
+def make_plan(topic: str) -> list[str]:
+    """Return a short research plan for the topic."""
+    ...
+
+@llm
+def research_item(item: str) -> str:
+    """Research one item and return the important findings."""
+    ...
+
+@flow
+def research(topic: str) -> str:
+    plan = step(lambda: make_plan(topic), name="plan")
+    findings = [
+        retry(
+            RetryPolicy(attempts=3, delay=0.5, backoff=2),
+            lambda item=item: research_item(item),
+            name=f"research_{index}",
+        )
+        for index, item in enumerate(plan)
+    ]
+    return "\n".join(findings)
+
+run = research("typed Python workflow libraries")
+print(run.status)
+print(run.result())
+
+# Background execution is opt-in.
+live_run = research.start("LLM observability")
+live_run.stop()  # Cooperative for synchronous functions.
+```
+
+Use `await async_flow(...)` for an `async def` flow. Async step operations are also awaited:
+
+```python
+@flow
+async def fetch_all(urls: list[str]) -> list[str]:
+    return [await step(lambda url=url: fetch(url)) for url in urls]
+```
+
+### 5. Autonomous Codex Tasks (`@task`)
 
 When the Codex CLI is installed, `auto` selects it for the existing decorators and
 `@task` can run a complete non-interactive coding-agent task. Tasks return the final
