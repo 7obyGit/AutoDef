@@ -2,12 +2,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import BaseModel
 
 from autodef import TaskResult, task
 from autodef.services.codex import (
     DEFAULT_CODEX_MODEL,
     DEFAULT_CODEX_REASONING_EFFORT,
+    CodexExecutionError,
     CodexService,
+    _strict_json_schema,
 )
 
 
@@ -115,6 +118,39 @@ def test_codex_skips_repo_check_outside_git_repository(monkeypatch: pytest.Monke
     command = run.call_args.args[0]
     assert "--skip-git-repo-check" in command
     assert run.call_args.kwargs["cwd"] is None
+
+
+def test_codex_execution_error_includes_json_error_event() -> None:
+    completed = type(
+        "Completed",
+        (),
+        {
+            "stdout": '{"type":"error","error":{"message":"schema rejected"}}',
+            "stderr": "Reading additional input from stdin...",
+            "returncode": 1,
+        },
+    )()
+
+    with (
+        patch.object(CodexService, "available", True),
+        patch("autodef.services.codex.subprocess.run", return_value=completed),
+        pytest.raises(CodexExecutionError, match="schema rejected"),
+    ):
+        CodexService().run("do it")
+
+
+def test_codex_structured_schemas_forbid_additional_properties() -> None:
+    class Nested(BaseModel):
+        value: str
+
+    class Response(BaseModel):
+        nested: Nested
+
+    schema = _strict_json_schema(Response.model_json_schema())
+
+    assert schema["additionalProperties"] is False
+    nested_schema = schema["$defs"]["Nested"]
+    assert nested_schema["additionalProperties"] is False
 
 
 def test_task_decorator_returns_codex_result() -> None:
