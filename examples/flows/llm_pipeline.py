@@ -41,7 +41,7 @@ def write_report(topic: str, findings: list[Finding]) -> Report:
     return Report(title="", summary="", findings=[])
 
 
-@flow(progress=True)
+@flow(silent=False)
 def research(topic: str) -> Report:
     plan = step(lambda: plan_research(topic), name="plan")
     findings: list[Finding] = [

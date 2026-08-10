@@ -28,12 +28,12 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-@flow(progress=True)
+@flow(silent=False)
 def tracked_work() -> int:
     return step(lambda: 42, name="compute")
 ```
 
-`progress=True` prints compact flow and step updates to stdout, including start, completion, retry attempts, failures, and elapsed time. It defaults to `False`, so library consumers do not receive unsolicited console output. The LLM pipeline example enables it because model calls can take noticeable time.
+`silent=False` prints compact flow and step updates to stdout, including start, completion, retry attempts, failures, and elapsed time. It defaults to `True`, so library consumers do not receive unsolicited console output. The LLM pipeline example enables tracking because model calls can take noticeable time.
 
 ## Why operations are zero-argument callables
 

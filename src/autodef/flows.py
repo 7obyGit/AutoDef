@@ -13,7 +13,7 @@ from functools import update_wrapper
 from typing import Any, cast, overload
 
 logger = logging.getLogger(__name__)
-_progress_lock = threading.RLock()
+_tracking_lock = threading.RLock()
 
 
 class RunStatus(StrEnum):
@@ -115,7 +115,7 @@ class FlowRun[R]:
     ) -> None:
         self._flow = flow
         self._flow_name = flow._name
-        self._progress_enabled = flow._progress_enabled
+        self._silent = flow._silent
         self._parent_run = _current_run.get()
         self._args = args
         self._kwargs = kwargs
@@ -133,9 +133,9 @@ class FlowRun[R]:
         self._steps: list[StepRun] = []
 
     @property
-    def progress(self) -> bool:
-        """Whether this run prints human-readable progress to stdout."""
-        return self._progress_enabled
+    def silent(self) -> bool:
+        """Whether this run suppresses human-readable tracking on stdout."""
+        return self._silent
 
     @property
     def name(self) -> str:
@@ -143,10 +143,10 @@ class FlowRun[R]:
         return self._flow_name
 
     @property
-    def _progress_depth(self) -> int:
+    def _tracking_depth(self) -> int:
         if self._parent_run is None:
             return 0
-        return self._parent_run._progress_depth + 1
+        return self._parent_run._tracking_depth + 1
 
     @property
     def steps(self) -> Sequence[StepRun]:
@@ -282,10 +282,10 @@ class AsyncFlowRun[R](FlowRun[R]):
 class SyncFlow[**P, R]:
     """Callable wrapper for a synchronous flow function."""
 
-    def __init__(self, function: Callable[P, R], *, progress: bool = False) -> None:
+    def __init__(self, function: Callable[P, R], *, silent: bool = True) -> None:
         self._function = function
         self._name = function.__name__
-        self._progress_enabled = progress
+        self._silent = silent
         update_wrapper(self, function)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> SyncFlowRun[R]:
@@ -343,10 +343,10 @@ class SyncFlow[**P, R]:
 class AsyncFlow[**P, R]:
     """Callable wrapper for an asynchronous flow function."""
 
-    def __init__(self, function: Callable[P, Awaitable[R]], *, progress: bool = False) -> None:
+    def __init__(self, function: Callable[P, Awaitable[R]], *, silent: bool = True) -> None:
         self._function = function
         self._name = function.__name__
-        self._progress_enabled = progress
+        self._silent = silent
         update_wrapper(self, function)
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> AsyncFlowRun[R]:
@@ -421,8 +421,8 @@ class AsyncFlow[**P, R]:
 class _ConfiguredFlow:
     """Decorator factory carrying flow options until a function is supplied."""
 
-    def __init__(self, *, progress: bool) -> None:
-        self._progress = progress
+    def __init__(self, *, silent: bool) -> None:
+        self._silent = silent
 
     @overload
     def __call__[**P, R](  # type: ignore[overload-overlap]
@@ -434,8 +434,8 @@ class _ConfiguredFlow:
 
     def __call__(self, function: Callable[..., Any], /) -> SyncFlow[..., Any] | AsyncFlow[..., Any]:
         if inspect.iscoroutinefunction(function):
-            return AsyncFlow(cast(Callable[..., Awaitable[Any]], function), progress=self._progress)
-        return SyncFlow(function, progress=self._progress)
+            return AsyncFlow(cast(Callable[..., Awaitable[Any]], function), silent=self._silent)
+        return SyncFlow(function, silent=self._silent)
 
 
 @overload
@@ -449,31 +449,31 @@ def flow[**P, R](function: Callable[P, R], /) -> SyncFlow[P, R]: ...
 
 
 @overload
-def flow(*, progress: bool = False) -> _ConfiguredFlow: ...
+def flow(*, silent: bool = True) -> _ConfiguredFlow: ...
 
 
-def flow(function: Callable[..., Any] | None = None, *, progress: bool = False) -> Any:
+def flow(function: Callable[..., Any] | None = None, *, silent: bool = True) -> Any:
     """Turn a typed function into an observable flow.
 
-    Set ``progress=True`` to print human-readable lifecycle and step updates.
+    Set ``silent=False`` to print human-readable lifecycle and step updates.
     Logging is always emitted through the ``autodef.flows`` logger.
     """
 
     if function is None:
-        return _ConfiguredFlow(progress=progress)
+        return _ConfiguredFlow(silent=silent)
     if inspect.iscoroutinefunction(function):
-        return AsyncFlow(cast(Callable[..., Awaitable[Any]], function), progress=progress)
-    return SyncFlow(function, progress=progress)
+        return AsyncFlow(cast(Callable[..., Awaitable[Any]], function), silent=silent)
+    return SyncFlow(function, silent=silent)
 
 
 def _flow_event(run: FlowRun[Any], message: str, *, level: int = logging.INFO, duration: float | None = None) -> None:
     if duration is not None:
         message = f"{message} ({duration:.2f}s)"
     logger.log(level, "[%s] %s", run.name, message)
-    if not run.progress:
+    if run.silent:
         return
-    prefix = "  " * run._progress_depth
-    with _progress_lock:
+    prefix = "  " * run._tracking_depth
+    with _tracking_lock:
         print(f"{prefix}[{run.name}] {message}", flush=True)
 
 
